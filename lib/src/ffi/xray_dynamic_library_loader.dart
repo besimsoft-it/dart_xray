@@ -44,7 +44,7 @@ class XrayDynamicLibraryLoader {
 
   Iterable<String> _defaultNames() sync* {
     if (Platform.isAndroid || Platform.isLinux) {
-      yield 'libdart_xray_ffi.so';
+      yield 'libgojni.so';
       return;
     }
     if (Platform.isWindows) {

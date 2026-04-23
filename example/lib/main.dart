@@ -24,7 +24,7 @@ class XrayDemoPage extends StatefulWidget {
 }
 
 class _XrayDemoPageState extends State<XrayDemoPage> {
-  final _controller = TextEditingController();
+  final _controller = TextEditingController(text: 'vless://80cbd2e5-ceca-4f3c-9566-e39c2cb3719f@94.177.201.17:443?security=reality&type=tcp&headerType=&flow=xtls-rprx-vision&path=&host=&sni=yandex.ru&fp=chrome&pbk=eF1_pRWT5VDYbkEY3EzHTwXDQx1qD1f7aDJcHVxLK1M&sid=6ba87f12#🛡 VieraVPN F0%9F%9A%80%20Marz%20%28260994604%29%20%5BVLESS%20-%20tcp%5D');
   XrayConnectionStatus _status = XrayConnectionStatus.disconnected;
   Duration? _delay;
   StreamSubscription<XrayConnectionStatus>? _statusSub;

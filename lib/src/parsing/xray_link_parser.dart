@@ -40,12 +40,14 @@ class XrayLinkParser {
       _ => throw FormatException('Unsupported scheme: ${uri.scheme}'),
     };
 
+    print(uri.fragment);
+
     return ParsedXrayLink(
       protocol: protocol,
       host: uri.host,
       port: uri.port,
       user: uri.userInfo.isEmpty ? null : uri.userInfo,
-      remark: uri.fragment.isEmpty ? null : Uri.decodeComponent(uri.fragment),
+      remark: uri.fragment.isEmpty ? null : null,
       query: uri.queryParameters,
     );
   }

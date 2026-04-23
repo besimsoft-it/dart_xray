@@ -69,8 +69,7 @@ class DartXrayVpnService : VpnService() {
     )
 
     return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-      .setSmallIcon(android.R.drawable.stat_sys_vpn_ic)
-      .setContentTitle("dart_xray VPN")
+
       .setContentText("VPN tunnel is active")
       .setContentIntent(pendingIntent)
       .setOngoing(true)
