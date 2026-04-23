@@ -1,11 +1,11 @@
 import 'dart:async';
 
+import 'ffi/xray_engine_ffi.dart';
 import 'models/xray_connection_status.dart';
 import 'models/xray_init_options.dart';
 import 'models/parsed_xray_link.dart';
 import 'models/xray_start_request.dart';
 import 'parsing/xray_link_parser.dart';
-import 'platform/dart_xray_platform_interface.dart';
 
 /// Main Dart API for controlling libXray-backed sessions.
 class DartXray {
@@ -14,55 +14,47 @@ class DartXray {
   /// Singleton instance used by apps.
   static final DartXray instance = DartXray._();
 
+  static XrayFfiEngine _engine = XrayFfiEngine();
+
+  /// Allows tests to replace the FFI engine.
+  static set debugEngineOverride(XrayFfiEngine engine) {
+    _engine = engine;
+  }
+
   /// Stream of native state transitions for the current process session.
-  Stream<XrayConnectionStatus> get onStatusChanged =>
-      DartXrayPlatform.instance.statusStream;
+  Stream<XrayConnectionStatus> get onStatusChanged => _engine.onStatusChanged;
 
   /// Long-lived stream intended for persistent listeners across restarts.
   Stream<XrayConnectionStatus> get persistentStatusStream =>
-      DartXrayPlatform.instance.persistentStatusStream;
+      _engine.persistentStatusStream;
 
   /// Initializes native engine prerequisites.
-  Future<void> init(XrayInitOptions options) {
-    return DartXrayPlatform.instance.init(options);
-  }
+  Future<void> init(XrayInitOptions options) => _engine.init(options);
 
-  /// Requests Android VPN permission when needed.
-  ///
-  /// On non-Android platforms this returns true.
-  Future<bool> prepareVpnPermission() {
-    return DartXrayPlatform.instance.prepareVpnPermission();
-  }
+
+  /// Engine integration is pure FFI; VPN consent remains app-owned native setup.
+  Future<bool> prepareVpnPermission() async => true;
 
   /// Starts proxy or TUN mode depending on [request.mode].
-  Future<void> start(XrayStartRequest request) {
-    return DartXrayPlatform.instance.start(request);
-  }
+  Future<void> start(XrayStartRequest request) => _engine.start(request);
 
   /// Stops the active session and tears down native resources.
-  Future<void> stop() {
-    return DartXrayPlatform.instance.stop();
-  }
+  Future<void> stop() => _engine.stop();
 
   /// Measures delay for a provided link or JSON config payload.
-  Future<Duration?> getServerDelay(String linkOrConfig) {
-    return DartXrayPlatform.instance.getServerDelay(linkOrConfig);
-  }
+  Future<Duration?> getServerDelay(String linkOrConfig) =>
+      _engine.getServerDelay(linkOrConfig);
 
   /// Measures delay of the currently active server.
-  Future<Duration?> getCurrentServerDelay() {
-    return DartXrayPlatform.instance.getCurrentServerDelay();
-  }
+  Future<Duration?> getCurrentServerDelay() => _engine.getCurrentServerDelay();
 
   /// Starts a native listener that survives repeated start/stop cycles.
-  Future<void> startPersistentStatusListener() {
-    return DartXrayPlatform.instance.startPersistentStatusListener();
-  }
+  Future<void> startPersistentStatusListener() =>
+      _engine.startPersistentStatusListener();
 
   /// Stops the long-lived native status listener.
-  Future<void> stopPersistentStatusListener() {
-    return DartXrayPlatform.instance.stopPersistentStatusListener();
-  }
+  Future<void> stopPersistentStatusListener() =>
+      _engine.stopPersistentStatusListener();
 
   /// Parses one Xray-compatible link.
   ParsedXrayLink parseLink(String link) => XrayLinkParser.parseLink(link);

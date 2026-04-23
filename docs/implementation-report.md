@@ -1,40 +1,65 @@
-# Implementation report
+# Implementation Report
 
-## Architecture summary
+## Step 1 audit summary
 
-- Unified Dart API in `DartXray`.
-- Method/Event channel based native boundary.
-- Public parsing utilities convert links into normalized models and start requests.
-- Per-platform plugin registrants scaffolded for future libXray runtime binding.
+Previous state:
+- Dart API delegated engine calls through platform interface + `MethodChannel`.
+- Status streams were backed by `EventChannel`.
+- Native integration was mostly scaffolded.
 
-## Feature matrix
+Reusable pieces:
+- Public API shape and data models.
+- Link parser and tests.
 
-| Feature | Status |
-|---|---|
-| `init/start/stop` API | Implemented |
-| Delay APIs | Implemented at API contract level |
-| Live status streams | Implemented |
-| Persistent status stream API | Implemented |
-| Link parsing (VLESS/VMess/Trojan/SS/SOCKS/HTTP) | Implemented |
-| Native libXray start/stop integration | Scaffolded |
-| Android VpnService wiring | Implemented scaffold with explicit service + JNI contracts |
-| Apple NetworkExtension wiring | Scaffolded + documented |
-| Windows/Linux runtime + TUN dependency wiring | Scaffolded + documented |
+Replaced pieces:
+- Channel-backed engine control path.
+- Platform interface as primary runtime contract.
 
-## Fully implemented now
+## Step 2 architecture chosen
 
-- Dart API contract and models.
-- Parser module and parser tests.
-- Example Flutter UI flow.
-- Comprehensive platform setup documentation.
+- Single FFI-first engine path for all platforms.
+- Stable symbol contract (`dart_xray_*`) to isolate libXray internals.
+- Callback-based native status propagation to Dart streams.
+- Local artifact build/copy workflow treated as first-class.
 
-## Partial / remaining gaps
+## Step 3 implementation delivered
 
-- Native adapters currently return placeholder success and default `DISCONNECTED` status.
-- Actual libXray wrappers must be compiled and invoked per platform.
-- TUN data-path orchestration must be implemented in native layers.
+Added:
+- `lib/src/ffi/xray_dynamic_library_loader.dart`
+- `lib/src/ffi/xray_native_bindings.dart`
+- `lib/src/ffi/xray_engine_ffi.dart`
+- `lib/src/ffi/xray_ffi_exceptions.dart`
 
-## Tradeoffs
+Updated:
+- `DartXray` now calls FFI engine directly.
+- Tests now mock FFI engine instead of platform channel interface.
 
-- Prioritized API stability and explicit docs over fake native completeness.
-- Chose platform channels for broad Flutter compatibility and async event support.
+## Step 4 channel isolation
+
+Engine operations (`init/start/stop/delay/status`) no longer depend on channels.
+Legacy platform plugin classes may still exist in platform folders for app-host concerns, but are not used for engine control.
+
+## Step 5 documentation updates
+
+Updated:
+- `README.md`
+- `docs/architecture.md`
+
+Documented:
+- ABI symbols
+- artifact naming/placement by platform
+- local build and integration workflow
+- native VPN/TUN responsibilities outside FFI
+
+## Step 6 current state
+
+Fully implemented:
+- Dart API to FFI bridge
+- dynamic loading
+- symbol binding
+- callback stream propagation
+- explicit error mapping
+
+Manual work still required:
+- produce per-platform native artifacts from libXray + wrapper
+- wire VPN/TUN host-layer setup in each target app

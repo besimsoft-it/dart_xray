@@ -14,7 +14,7 @@ enum XrayConnectionStatus {
 }
 
 extension XrayConnectionStatusCodec on XrayConnectionStatus {
-  /// Converts status to the wire format used by platform channels.
+  /// Converts status to the wire format used by the native ABI.
   String get wireValue => switch (this) {
         XrayConnectionStatus.connecting => 'CONNECTING',
         XrayConnectionStatus.connected => 'CONNECTED',

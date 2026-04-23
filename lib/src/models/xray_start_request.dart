@@ -23,7 +23,7 @@ class XrayStartRequest {
     this.verifyConnectivity = true,
   });
 
-  /// Serializes request for platform channels.
+  /// Serializes request for the native FFI ABI.
   Map<String, Object?> toJson() => <String, Object?>{
         'configJson': configJson,
         'mode': mode,

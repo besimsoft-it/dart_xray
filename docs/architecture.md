@@ -1,49 +1,55 @@
-# Architecture
+# dart_xray FFI Architecture
 
-## 1) libXray analysis summary
+## Core decision
 
-Based on `XTLS/libXray` public repository:
-- The project exposes Go wrapper entry points to start/stop Xray instances and utility operations such as config testing and latency checks.
-- Android-specific wrappers include socket protection hooks for `VpnService` compatibility.
-- Build outputs are intended to be consumed by mobile bindings (gomobile/JNI/ObjC) and native wrappers.
+`dart_xray` uses direct `dart:ffi` for engine integration on all supported platforms:
+- Android
+- iOS
+- macOS
+- Windows
+- Linux
 
-Practical constraints:
-- Apple TUN mode requires `NetworkExtension` and an extension target.
-- Android TUN mode requires `VpnService` and route/protect logic.
-- Desktop TUN commonly needs OS-level privileges and drivers (`wintun` or `/dev/net/tun`).
+`MethodChannel`/`EventChannel` are not part of the engine control path.
 
-## 2) Plugin layering
+## Layers
 
-- **Dart API layer**: `lib/src/dart_xray_api.dart`
-- **Platform abstraction**: `lib/src/platform/dart_xray_platform_interface.dart`
-- **Platform channel transport**: `lib/src/platform/method_channel_dart_xray.dart`
-- **Parser + config normalization**: `lib/src/parsing/*`, `lib/src/models/*`
-- **Native adapters**: `android/`, `ios/`, `macos/`, `windows/`, `linux/`
+1. **Public Dart API** (`DartXray`)
+   - `init/start/stop/getServerDelay/getCurrentServerDelay`
+   - status streams
+   - parsing helpers
+2. **FFI engine bridge** (`lib/src/ffi/*`)
+   - dynamic library loading
+   - symbol binding
+   - callback registration and stream fan-out
+   - explicit exception mapping
+3. **Native ABI wrapper** (built from libXray + thin C exports)
+   - stable C symbols consumed by Dart
+4. **Platform-native VPN/TUN host pieces**
+   - VpnService / Network Extension / TUN driver setup
 
-## 3) Integration strategy
+## Native callback model
 
-A hybrid approach is used:
-- Stable Flutter MethodChannel/EventChannel surface first.
-- Native adapters are scaffolded for each OS and expected to call a platform-appropriate libXray wrapper.
-- Asynchronous status updates are pushed via event channels.
+Dart registers a native callback function pointer through FFI.
+Native runtime pushes status updates (`CONNECTING`, `CONNECTED`, `DISCONNECTED`, `ERROR`) through this callback.
+Dart converts them into:
+- `onStatusChanged`
+- `persistentStatusStream`
 
-## 4) Status design
+No EventChannel is used.
 
-Status mapping is fixed to:
-- `CONNECTING`
-- `CONNECTED`
-- `DISCONNECTED`
-- `ERROR`
+## Artifact loading strategy
 
-Recommended transition flow:
-1. `start()` request accepted -> `CONNECTING`
-2. Runtime active -> `CONNECTED`
-3. Stop/cleanup complete -> `DISCONNECTED`
-4. Any startup/runtime failure -> `ERROR`
+Loader checks, in order:
+1. env `DART_XRAY_LIB_PATH`
+2. `XrayInitOptions.nativeAssetsPath`
+3. platform defaults (`libdart_xray_ffi.so`, `dart_xray_ffi.dll`, process/framework on Apple)
 
-## 5) Why this structure
+Failure throws `XrayNativeLibraryLoadException` with attempted locations.
 
-This architecture prioritizes:
-- Uniform public API.
-- Explicit platform constraints.
-- Incremental hardening of native wrappers without breaking Flutter consumers.
+## Error model
+
+- load failures → `XrayNativeLibraryLoadException`
+- missing symbols → `XrayNativeSymbolException`
+- runtime native errors → `XrayNativeCallException`
+
+Errors are explicit; no silent fallbacks.

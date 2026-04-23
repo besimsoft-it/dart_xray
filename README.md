@@ -1,86 +1,79 @@
 # dart_xray
 
-`dart_xray` is a production-oriented Flutter plugin scaffold for integrating **XTLS/libXray** with a uniform Dart API across Android, iOS, macOS, Windows, and Linux.
+`dart_xray` is a Flutter plugin/package that controls a `libXray`-based runtime through **direct Dart FFI** on Android, iOS, macOS, Windows, and Linux.
 
-> This repository provides:
-> - A stable Dart API surface.
-> - Link parsing and request normalization utilities.
-> - Platform channel bridges and status stream contracts.
-> - Full setup documentation for platform-specific VPN/TUN requirements.
+## Architecture (mandatory)
 
-## Current implementation status
+Engine control path is FFI-only:
+- `dart:ffi` + stable C ABI exports
+- no `MethodChannel` for `init/start/stop/delay/status`
+- no `EventChannel` for status streaming
 
-This first implementation focuses on **API stability and integration scaffolding**. Native runtime hookup to libXray is intentionally explicit and documented rather than faked.
+Public API remains Dart-owned via `DartXray`.
 
-- ✅ Dart API implemented.
-- ✅ Link parsing utilities implemented (VLESS, VMess, Trojan, Shadowsocks, SOCKS/HTTP forms).
-- ✅ Status stream contract implemented.
-- ✅ Platform plugin entry points added for all targets.
-- ⚠️ Native libXray runtime binding is scaffolded and must be completed per platform build pipeline.
+## Stable native ABI contract
 
-## Install
+The native artifact must export these symbols:
 
-```yaml
-dependencies:
-  dart_xray:
-    git:
-      url: https://github.com/your-org/dart_xray.git
-```
+- `int32_t dart_xray_init(const char* json, char* err, int32_t err_len)`
+- `int32_t dart_xray_start(const char* json, char* err, int32_t err_len)`
+- `int32_t dart_xray_stop(char* err, int32_t err_len)`
+- `int32_t dart_xray_destroy(char* err, int32_t err_len)`
+- `int64_t dart_xray_get_server_delay(const char* input, char* err, int32_t err_len)`
+- `int64_t dart_xray_get_current_server_delay(const char* input, char* err, int32_t err_len)`
+- `int32_t dart_xray_register_status_callback(void (*cb)(int32_t,const char*,void*), void* user, char* err, int32_t err_len)`
+- `int32_t dart_xray_unregister_status_callback(char* err, int32_t err_len)`
 
-## Quick start
+Status code mapping:
+- `0 = CONNECTING`
+- `1 = CONNECTED`
+- `2 = DISCONNECTED`
+- `3+ = ERROR`
+
+## Artifact names and placement
+
+Build native artifacts locally, then copy into your app/plugin packaging pipeline.
+
+| Platform | Artifact name expected by Dart loader | Typical packaging location |
+|---|---|---|
+| Android | `libdart_xray_ffi.so` | `android/src/main/jniLibs/<abi>/libdart_xray_ffi.so` |
+| iOS | symbols in process (`dart_xray_ffi.framework`) | embedded framework in app/extension |
+| macOS | `dart_xray_ffi.framework/dart_xray_ffi` or `libdart_xray_ffi.dylib` | `macos/Runner/Frameworks` |
+| Windows | `dart_xray_ffi.dll` | next to executable or configured runtime dir |
+| Linux | `libdart_xray_ffi.so` | next to executable or system library path |
+
+Override path at runtime with:
+- env var `DART_XRAY_LIB_PATH`, or
+- `XrayInitOptions(nativeAssetsPath: ...)`
+
+## Local build workflow
+
+1. Build libXray-based native wrapper per target platform.
+2. Ensure it exports the ABI symbols above.
+3. Copy artifacts to the platform packaging location.
+4. Start Flutter app; `DartXray` loads artifact with `dart:ffi`.
+
+## Platform-specific responsibilities (outside engine FFI)
+
+- Android: `VpnService`, socket protect, foreground service policy.
+- Apple: `NEPacketTunnelProvider`, entitlements, signing, app group wiring.
+- Linux/Windows: TUN interface setup, permissions/driver/runtime dependencies.
+
+These responsibilities remain native, but engine control stays FFI-based.
+
+## API
 
 ```dart
 final xray = DartXray.instance;
-
-await xray.init(const XrayInitOptions(
-  workingDirectory: '/tmp/dart_xray',
-  enableDebugLogs: true,
-));
-
+await xray.init(const XrayInitOptions(workingDirectory: '/tmp/dart_xray'));
 await xray.startPersistentStatusListener();
-
-final sub = xray.onStatusChanged.listen((status) {
-  print('status: ${status.wireValue}');
-});
-
-final request = xray.requestFromLink('vless://uuid@example.com:443?security=tls#main');
 await xray.start(request);
-
-final ping = await xray.getCurrentServerDelay();
+final delay = await xray.getCurrentServerDelay();
 await xray.stop();
-await sub.cancel();
 ```
 
-## Platform feature matrix
+Status streams:
+- `onStatusChanged`
+- `persistentStatusStream`
 
-| Platform | Proxy mode | TUN mode | Additional setup | Example runs OOTB |
-|---|---|---|---|---|
-| Android | JNI scaffold with explicit libxray.so contract | VpnService + TUN handoff scaffold | Local libXray Android build + jniLibs install | Requires local native artifact |
-| iOS | Scaffolded | Scaffolded via NEPacketTunnelProvider | Network Extension target, entitlements, signing | Requires Xcode edits |
-| macOS | Scaffolded | Scaffolded via Network Extension | Entitlements, sandbox + extension target | Requires Xcode edits |
-| Windows | Scaffolded | Scaffolded | Wintun/driver/admin caveats | Requires native dependencies |
-| Linux | Scaffolded | Scaffolded | `CAP_NET_ADMIN`, `/dev/net/tun`, routing permissions | Requires host setup |
-
-See docs:
-- [Architecture](docs/architecture.md)
-- [Android native build workflow](docs/android-native-build.md)
-- [Status model](docs/status-model.md)
-- [Parsing](docs/parsing.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- Platform guides under [`docs/platforms/`](docs/platforms)
-
-## Security notes
-
-- Never log raw credentials in production.
-- Validate and sanitize remote configs before start.
-- Restrict working directory permissions.
-- Use platform secure storage for secrets.
-
-## Building native artifacts
-
-libXray integration can be done through different paths per platform:
-- Go mobile bindings (`gomobile bind`) for Apple/Android wrappers.
-- Go `c-shared` wrappers for desktop.
-- Native helper process bridge where driver/runtime packaging is required.
-
-Detailed guidance is documented per platform.
+Parser utilities include VLESS, VMess, Trojan, Shadowsocks, SOCKS, and HTTP link forms.

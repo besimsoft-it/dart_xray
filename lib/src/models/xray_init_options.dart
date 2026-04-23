@@ -19,7 +19,7 @@ class XrayInitOptions {
     this.nativeAssetsPath,
   });
 
-  /// Converts options to a JSON map sent to the native side.
+  /// Converts options to a JSON map consumed by the native ABI layer.
   Map<String, Object?> toJson() => <String, Object?>{
         'workingDirectory': workingDirectory,
         'enableDebugLogs': enableDebugLogs,

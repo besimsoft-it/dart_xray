@@ -7,3 +7,4 @@ export 'src/models/xray_init_options.dart';
 export 'src/models/xray_start_request.dart';
 export 'src/models/parsed_xray_link.dart';
 export 'src/parsing/xray_link_parser.dart';
+export 'src/ffi/xray_ffi_exceptions.dart';

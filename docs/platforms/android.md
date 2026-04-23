@@ -1,111 +1,44 @@
 # Android
 
-This page defines the concrete Android integration contract for `dart_xray` + `libXray`.
+Android engine control is FFI-based, same as other platforms.
 
-## Chosen native integration model
+## Artifact contract
 
-`dart_xray` uses this model:
+Build locally and package per ABI:
 
-1. Build `libXray` Android native output **locally**.
-2. Copy generated `libxray.so` files into plugin `jniLibs`.
-3. Plugin loads `libxray.so` using `System.loadLibrary("xray")` and calls JNI methods from `XrayNativeBridge`.
+- `android/src/main/jniLibs/arm64-v8a/libdart_xray_ffi.so`
+- `android/src/main/jniLibs/armeabi-v7a/libdart_xray_ffi.so`
+- `android/src/main/jniLibs/x86_64/libdart_xray_ffi.so`
 
-This avoids forcing a Go toolchain into every Flutter build.
+Dart loads `libdart_xray_ffi.so` via `dart:ffi`.
 
-## Expected native artifact
+## Runtime boundary
 
-Expected artifact per ABI:
+FFI handles engine operations:
+- `init`
+- `start`
+- `stop`
+- delay APIs
+- status callback registration
 
-- `libxray.so`
+Android-native app/service code still owns:
+- `VpnService.prepare(...)` consent UX
+- foreground service policy
+- socket protect routing (`VpnService.protect`)
+- TUN fd lifecycle and handoff
 
-Expected plugin location:
+These host responsibilities must not move engine control back to channels.
 
-- `android/src/main/jniLibs/<abi>/libxray.so`
+## Local workflow
 
-Example:
+1. Build libXray + thin C ABI wrapper for Android.
+2. Ensure exported symbols match `dart_xray_*` ABI.
+3. Copy `.so` files into `android/src/main/jniLibs/<abi>/`.
+4. Build and run Flutter app.
 
-```text
-android/src/main/jniLibs/
-  arm64-v8a/libxray.so
-  armeabi-v7a/libxray.so
-  x86_64/libxray.so
-```
+## Common failures
 
-If missing, `init()` fails with error code `native_artifact_missing`.
-
-## Local build + install steps
-
-```bash
-# 1) clone upstream
-# https://github.com/XTLS/libXray
-
-# 2) build Android output
-python3 build/main.py android
-
-# 3) install into this plugin
-cd /path/to/dart_xray
-./scripts/android/install_libxray.sh /path/to/libxray/build/output
-```
-
-Then run your Flutter Android build as usual.
-
-## Android runtime ownership
-
-### Plugin layer
-
-- `DartXrayPlugin` handles method/event channels.
-- `AndroidXraySessionManager` validates init/start/stop and emits status.
-
-### VPN layer
-
-- `DartXrayVpnService` owns `VpnService` lifecycle.
-- service is declared in `android/src/main/AndroidManifest.xml`.
-- service runs foreground for long-running sessions.
-
-## VPN consent flow
-
-- Flutter calls `prepareVpnPermission()`.
-- Native calls `VpnService.prepare(activity)`.
-- If consent UI is needed, Android shows it.
-- `start()` fails with `vpn_permission_not_granted` until permission is granted.
-
-## Socket protect contract
-
-Native side must call JNI endpoint:
-
-- `nativeProtectSocket(fd: Int): Boolean`
-
-This is the integration point for Android `VpnService.protect(fd)` semantics.
-Without this, outbound sockets can loop back into VPN routes.
-
-## DNS handling contract
-
-To avoid DNS recursion/looping:
-
-- service calls `nativeInitDns(dnsServer)` before engine start
-- service calls `nativeResetDns()` on stop
-
-Native resolver sockets must be protected before connect.
-
-## TUN handoff contract
-
-When `mode == "tun"`:
-
-1. service creates TUN with `VpnService.Builder.establish()`
-2. service passes TUN file descriptor to `nativeAttachTunFd(FileDescriptor)`
-3. service starts engine with `nativeStartEngine(mode)`
-
-For `proxy` mode, TUN fd is not attached.
-
-## Explicit startup errors
-
-Android layer returns explicit errors:
-
-- `native_artifact_missing`
-- `native_engine_unavailable`
-- `vpn_permission_not_granted`
-- `not_initialized`
-- `tun_startup_not_wired`
-- `invalid_arguments`
-
-Use these errors as actionable integration feedback.
+- Missing `.so` → library load exception at `init`.
+- Missing symbol export → symbol lookup exception.
+- VPN permission not granted → start should fail in host-layer integration.
+- DNS/socket loop → protect sockets used by engine and DNS helper paths.
