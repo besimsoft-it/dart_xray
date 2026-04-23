@@ -17,7 +17,7 @@
 | Persistent status stream API | Implemented |
 | Link parsing (VLESS/VMess/Trojan/SS/SOCKS/HTTP) | Implemented |
 | Native libXray start/stop integration | Scaffolded |
-| Android VpnService wiring | Scaffolded + documented |
+| Android VpnService wiring | Implemented scaffold with explicit service + JNI contracts |
 | Apple NetworkExtension wiring | Scaffolded + documented |
 | Windows/Linux runtime + TUN dependency wiring | Scaffolded + documented |
 

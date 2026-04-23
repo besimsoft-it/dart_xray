@@ -29,6 +29,11 @@ abstract class DartXrayPlatform extends PlatformInterface {
 
   Future<void> init(XrayInitOptions options);
 
+  /// Requests Android VPN permission when required.
+  ///
+  /// Returns true when permission is already granted or has just been granted.
+  Future<bool> prepareVpnPermission() async => true;
+
   Future<void> start(XrayStartRequest request);
 
   Future<void> stop();

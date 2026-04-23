@@ -55,7 +55,7 @@ await sub.cancel();
 
 | Platform | Proxy mode | TUN mode | Additional setup | Example runs OOTB |
 |---|---|---|---|---|
-| Android | Scaffolded | Scaffolded | VpnService, foreground service, native libXray binaries | Requires Android edits |
+| Android | JNI scaffold with explicit libxray.so contract | VpnService + TUN handoff scaffold | Local libXray Android build + jniLibs install | Requires local native artifact |
 | iOS | Scaffolded | Scaffolded via NEPacketTunnelProvider | Network Extension target, entitlements, signing | Requires Xcode edits |
 | macOS | Scaffolded | Scaffolded via Network Extension | Entitlements, sandbox + extension target | Requires Xcode edits |
 | Windows | Scaffolded | Scaffolded | Wintun/driver/admin caveats | Requires native dependencies |
@@ -63,6 +63,7 @@ await sub.cancel();
 
 See docs:
 - [Architecture](docs/architecture.md)
+- [Android native build workflow](docs/android-native-build.md)
 - [Status model](docs/status-model.md)
 - [Parsing](docs/parsing.md)
 - [Troubleshooting](docs/troubleshooting.md)

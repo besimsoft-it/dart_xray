@@ -38,6 +38,15 @@ class MethodChannelDartXray extends DartXrayPlatform {
   }
 
   @override
+  Future<bool> prepareVpnPermission() async {
+    final raw = await _methodChannel.invokeMapMethod<String, Object?>('prepareVpn');
+    if (raw == null) return true;
+    final prepared = raw['prepared'] == true;
+    final consentRequired = raw['consentRequired'] == true;
+    return prepared || !consentRequired;
+  }
+
+  @override
   Future<void> start(XrayStartRequest request) {
     return _methodChannel.invokeMethod<void>('start', request.toJson());
   }
