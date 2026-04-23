@@ -47,6 +47,10 @@ class _XrayDemoPageState extends State<XrayDemoPage> {
     _persistentSub = DartXray.instance.persistentStatusStream.listen((_) {});
   }
 
+  Future<void> _prepareVpn() async {
+    await DartXray.instance.prepareVpnPermission();
+  }
+
   Future<void> _start() async {
     final request = DartXray.instance.requestFromLink(_controller.text);
     await DartXray.instance.start(request);
@@ -87,6 +91,7 @@ class _XrayDemoPageState extends State<XrayDemoPage> {
             ),
             const SizedBox(height: 8),
             Wrap(spacing: 8, children: [
+              ElevatedButton(onPressed: _prepareVpn, child: const Text('Prepare VPN')),
               ElevatedButton(onPressed: _start, child: const Text('Start')),
               ElevatedButton(onPressed: _stop, child: const Text('Stop')),
               ElevatedButton(onPressed: _measure, child: const Text('Ping')),

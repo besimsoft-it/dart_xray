@@ -27,6 +27,13 @@ class DartXray {
     return DartXrayPlatform.instance.init(options);
   }
 
+  /// Requests Android VPN permission when needed.
+  ///
+  /// On non-Android platforms this returns true.
+  Future<bool> prepareVpnPermission() {
+    return DartXrayPlatform.instance.prepareVpnPermission();
+  }
+
   /// Starts proxy or TUN mode depending on [request.mode].
   Future<void> start(XrayStartRequest request) {
     return DartXrayPlatform.instance.start(request);
