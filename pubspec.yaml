@@ -1,0 +1,37 @@
+name: dart_xray
+description: Cross-platform Flutter plugin for Xray/libXray based proxy and TUN connectivity.
+version: 0.1.0
+homepage: https://github.com/your-org/dart_xray
+repository: https://github.com/your-org/dart_xray
+issue_tracker: https://github.com/your-org/dart_xray/issues
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+  flutter: '>=3.22.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.1.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+documentation: docs/architecture.md
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.example.dart_xray
+        pluginClass: DartXrayPlugin
+      ios:
+        pluginClass: DartXrayPlugin
+      macos:
+        pluginClass: DartXrayPlugin
+      windows:
+        pluginClass: DartXrayPluginCApi
+      linux:
+        pluginClass: DartXrayPlugin
