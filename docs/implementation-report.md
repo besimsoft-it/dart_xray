@@ -1,65 +1,58 @@
 # Implementation Report
 
-## Step 1 audit summary
+## Hard-correction refactor summary
 
-Previous state:
-- Dart API delegated engine calls through platform interface + `MethodChannel`.
-- Status streams were backed by `EventChannel`.
-- Native integration was mostly scaffolded.
+This refactor removes platform-channel engine control and leaves engine integration FFI-only.
 
-Reusable pieces:
-- Public API shape and data models.
-- Link parser and tests.
+## Removed bridge classes/methods
 
-Replaced pieces:
-- Channel-backed engine control path.
-- Platform interface as primary runtime contract.
+Removed Android bridge layer classes that mirrored Dart engine APIs via channels/JNI proxies:
 
-## Step 2 architecture chosen
+- `android/src/main/kotlin/com/example/dart_xray/AndroidXraySessionManager.kt`
+- `android/src/main/kotlin/com/example/dart_xray/XrayNativeBridge.kt`
+- `android/src/main/kotlin/com/example/dart_xray/XrayEngineRegistry.kt`
+- `android/src/main/kotlin/com/example/dart_xray/XrayStatusStreamHandler.kt`
+- `android/src/main/kotlin/com/example/dart_xray/XrayConnectionState.kt`
+- `android/src/main/kotlin/com/example/dart_xray/XrayErrors.kt`
 
-- Single FFI-first engine path for all platforms.
-- Stable symbol contract (`dart_xray_*`) to isolate libXray internals.
-- Callback-based native status propagation to Dart streams.
-- Local artifact build/copy workflow treated as first-class.
+Removed channel-based engine handlers from platform plugin entrypoints:
 
-## Step 3 implementation delivered
+- Android `DartXrayPlugin.kt` no longer registers MethodChannel/EventChannel handlers.
+- iOS/macOS/Linux/Windows plugin entrypoints no longer expose engine method handlers.
 
-Added:
+## Remaining native OS-only classes
+
+Kept native code where OS/framework ownership is required:
+
+- `android/src/main/kotlin/com/example/dart_xray/DartXrayVpnService.kt`
+  - foreground service lifecycle
+  - TUN interface establishment and ownership
+
+Current plugin registrar classes remain minimal/no-op registrars and do not act as engine bridges.
+
+## FFI-bound engine entrypoints
+
+Engine-facing API is direct Dart FFI through:
+
 - `lib/src/ffi/xray_dynamic_library_loader.dart`
 - `lib/src/ffi/xray_native_bindings.dart`
 - `lib/src/ffi/xray_engine_ffi.dart`
-- `lib/src/ffi/xray_ffi_exceptions.dart`
 
-Updated:
-- `DartXray` now calls FFI engine directly.
-- Tests now mock FFI engine instead of platform channel interface.
+Required ABI symbols:
 
-## Step 4 channel isolation
+- `dart_xray_init`
+- `dart_xray_start`
+- `dart_xray_stop`
+- `dart_xray_destroy`
+- `dart_xray_get_server_delay`
+- `dart_xray_get_current_server_delay`
+- `dart_xray_register_status_callback`
+- `dart_xray_unregister_status_callback`
 
-Engine operations (`init/start/stop/delay/status`) no longer depend on channels.
-Legacy platform plugin classes may still exist in platform folders for app-host concerns, but are not used for engine control.
+Status stream implementation is now FFI callback-backed only (no EventChannel).
 
-## Step 5 documentation updates
+## Platform-specific limitations / follow-ups
 
-Updated:
-- `README.md`
-- `docs/architecture.md`
-
-Documented:
-- ABI symbols
-- artifact naming/placement by platform
-- local build and integration workflow
-- native VPN/TUN responsibilities outside FFI
-
-## Step 6 current state
-
-Fully implemented:
-- Dart API to FFI bridge
-- dynamic loading
-- symbol binding
-- callback stream propagation
-- explicit error mapping
-
-Manual work still required:
-- produce per-platform native artifacts from libXray + wrapper
-- wire VPN/TUN host-layer setup in each target app
+- Android VPN permission flow (`VpnService.prepare`) must be handled by the host app/native layer.
+- Android `DartXrayVpnService` currently covers OS lifecycle/TUN ownership only; engine orchestration stays in FFI path.
+- Teams integrating Packet Tunnel / Network Extension / desktop TUN drivers must keep those OS hooks outside engine API mirroring.

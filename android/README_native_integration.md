@@ -1,79 +1,46 @@
 # Android native integration (libXray)
 
-This plugin uses a **local-build-first** Android integration model.
+This plugin uses a **local-build-first** Android integration model with a thin FFI ABI wrapper.
 
 ## Expected artifact
 
-Expected native output from local `libXray` Android build:
+Expected native output consumed by Dart FFI:
 
-- JNI shared library: `libxray.so`
+- ABI shared library: `libdart_xray_ffi.so`
 - one folder per ABI (for example `arm64-v8a`, `armeabi-v7a`, `x86_64`)
 
 Place files in:
 
-- `android/src/main/jniLibs/<abi>/libxray.so`
+- `android/src/main/jniLibs/<abi>/libdart_xray_ffi.so`
 
 Example:
 
 ```
 android/src/main/jniLibs/
-  arm64-v8a/libxray.so
-  armeabi-v7a/libxray.so
-  x86_64/libxray.so
+  arm64-v8a/libdart_xray_ffi.so
+  armeabi-v7a/libdart_xray_ffi.so
+  x86_64/libdart_xray_ffi.so
 ```
-
-If `libxray.so` is missing, `init()` fails with `native_artifact_missing`.
 
 ## Local build + install workflow
 
-1. Clone upstream libXray.
-2. Run official Android build script:
+1. Build libXray for Android.
+2. Build/package the `dart_xray` ABI wrapper library that exports `dart_xray_*` symbols.
+3. Copy ABI folders into this plugin:
 
    ```bash
-   python3 build/main.py android
+   ./scripts/android/install_libxray.sh /path/to/abi-wrapper/output
    ```
 
-3. Locate generated `.so` files from libXray build output.
-4. Copy ABI folders into this plugin:
+4. Build your Flutter Android app.
 
-   ```bash
-   ./scripts/android/install_libxray.sh /path/to/libxray/output
-   ```
+## Android native scope (OS only)
 
-5. Build your Flutter Android app.
+Android native code in this repository is limited to OS/framework responsibilities:
 
-## VPN and service contract
+- `DartXrayVpnService` foreground lifecycle
+- TUN interface ownership (`VpnService.Builder.establish()`)
+- service declaration and lifecycle integration
 
-- `DartXrayPlugin` owns plugin channel and start/stop orchestration.
-- `DartXrayVpnService` owns VPN process lifecycle and foreground notification.
-- `prepareVpn` method calls `VpnService.prepare(activity)` and triggers consent UI.
-- `start()` requires prior consent; otherwise it fails with `vpn_permission_not_granted`.
-- `start()` starts `DartXrayVpnService` as a foreground service.
-
-## Socket protect contract
-
-`libXray` socket protect is expected through JNI method:
-
-- `nativeProtectSocket(fd: Int): Boolean`
-
-`DartXrayVpnService` is the Android owner of `VpnService.protect(fd)` semantics.
-The native side must call this JNI endpoint before opening protected outbound sockets.
-
-## DNS handling contract
-
-To prevent VPN recursion loops:
-
-- service calls `nativeInitDns(dnsServer)` before engine start
-- service calls `nativeResetDns()` on stop
-
-Native side should route resolver sockets through protect logic.
-
-## TUN handoff contract
-
-When mode is `tun`:
-
-1. service creates TUN via `VpnService.Builder.establish()`
-2. service passes TUN file descriptor to native using `nativeAttachTunFd(FileDescriptor)`
-3. service then calls `nativeStartEngine(mode)`
-
-For `proxy` mode, no TUN fd is attached.
+Engine operations are **not** proxied through Flutter channels.
+All engine controls (`init/start/stop/delay/status`) are FFI-based from Dart.

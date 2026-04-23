@@ -12,53 +12,32 @@ import android.os.ParcelFileDescriptor
 import androidx.core.app.NotificationCompat
 
 /**
- * Owns Android VpnService lifecycle and TUN handoff to native layer.
+ * Android OS integration only.
+ *
+ * This service owns foreground lifecycle and TUN setup. It does not mirror
+ * engine controls (init/start/stop/delay/status) for Dart; engine control is FFI-only.
  */
 class DartXrayVpnService : VpnService() {
   private var tunInterface: ParcelFileDescriptor? = null
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     when (intent?.action) {
-      ACTION_START -> startSession(intent)
+      ACTION_START -> startSession()
       ACTION_STOP -> stopSession()
       else -> Unit
     }
     return START_STICKY
   }
 
-  private fun startSession(intent: Intent) {
+  private fun startSession() {
     startForeground(NOTIFICATION_ID, buildForegroundNotification())
-
-    val config = intent.getStringExtra(EXTRA_XRAY_CONFIG)
-      ?: throw XrayPluginException(XrayErrors.INVALID_ARGUMENTS, "Missing EXTRA_XRAY_CONFIG")
-    val mode = intent.getStringExtra(EXTRA_MODE) ?: "proxy"
-    val dnsServer = intent.getStringExtra(EXTRA_DNS_SERVER) ?: "1.1.1.1:53"
-
-    val bridge = XrayEngineRegistry.bridge()
-    val startTun = mode.equals("tun", ignoreCase = true)
-
-    if (startTun) {
-      val tun = createTunInterface()
-      bridge.registerTunFd(tun.fileDescriptor)
-    }
-
-    bridge.registerDns(dnsServer)
-    val initCode = bridge.initEngine(config)
-    if (initCode != 0) {
-      throw XrayPluginException(XrayErrors.NATIVE_ENGINE_UNAVAILABLE, "nativeInitEngine failed with code=$initCode")
-    }
-
-    val startCode = bridge.startEngine(mode)
-    if (startCode != 0) {
-      throw XrayPluginException(XrayErrors.NATIVE_ENGINE_UNAVAILABLE, "nativeStartEngine failed with code=$startCode")
+    if (tunInterface == null) {
+      tunInterface = createTunInterface()
     }
   }
 
   private fun stopSession() {
     runCatching {
-      val bridge = XrayEngineRegistry.bridge()
-      bridge.stopEngine()
-      bridge.resetDns()
       tunInterface?.close()
       tunInterface = null
     }
@@ -67,7 +46,7 @@ class DartXrayVpnService : VpnService() {
   }
 
   private fun createTunInterface(): ParcelFileDescriptor {
-    val tun = Builder()
+    return Builder()
       .setSession("dart_xray")
       .setMtu(1500)
       .addAddress("10.111.0.2", 30)
@@ -75,10 +54,7 @@ class DartXrayVpnService : VpnService() {
       .addDnsServer("1.1.1.1")
       .addDnsServer("8.8.8.8")
       .establish()
-      ?: throw XrayPluginException(XrayErrors.TUN_STARTUP_NOT_WIRED, "VpnService.Builder.establish() returned null")
-
-    tunInterface = tun
-    return tun
+      ?: error("VpnService.Builder.establish() returned null")
   }
 
   private fun buildForegroundNotification(): Notification {
@@ -119,10 +95,6 @@ class DartXrayVpnService : VpnService() {
   companion object {
     const val ACTION_START = "com.example.dart_xray.action.START"
     const val ACTION_STOP = "com.example.dart_xray.action.STOP"
-
-    const val EXTRA_XRAY_CONFIG = "xray_config"
-    const val EXTRA_MODE = "xray_mode"
-    const val EXTRA_DNS_SERVER = "xray_dns_server"
 
     private const val NOTIFICATION_CHANNEL_ID = "dart_xray_vpn"
     private const val NOTIFICATION_ID = 7342
