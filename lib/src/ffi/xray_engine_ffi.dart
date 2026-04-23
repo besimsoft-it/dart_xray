@@ -25,7 +25,7 @@ class XrayFfiEngine {
   DynamicLibrary? _library;
   XrayNativeBindings? _bindings;
   XrayInitOptions? _lastInitOptions;
-  NativeCallable<XrayStatusCallbackDart>? _statusCallback;
+  NativeCallable<XrayStatusCallbackNative>? _statusCallback;
   bool _persistentListening = false;
 
   XrayFfiEngine({XrayDynamicLibraryLoader? libraryLoader})
@@ -75,11 +75,11 @@ class XrayFfiEngine {
     _ensureBound(_lastInitOptions);
     if (_persistentListening) return;
 
-    _statusCallback = NativeCallable<XrayStatusCallbackDart>.listener(
+    _statusCallback = NativeCallable<XrayStatusCallbackNative>.listener(
       _handleNativeStatus,
     );
 
-    final errorBuffer = calloc<Utf8>(_nativeErrorBufferLength);
+    final errorBuffer = calloc<Uint8>(_nativeErrorBufferLength).cast<Utf8>();
     try {
       final code = _bindings!.registerStatusCallback(
         _statusCallback!.nativeFunction,
@@ -130,7 +130,7 @@ class XrayFfiEngine {
 
   int _callJson(int Function(Pointer<Utf8>, Pointer<Utf8>, int) call, String payload, String operation) {
     final payloadPtr = payload.toNativeUtf8();
-    final errorBuffer = calloc<Utf8>(_nativeErrorBufferLength);
+    final errorBuffer = calloc<Uint8>(_nativeErrorBufferLength).cast<Utf8>();
     try {
       final code = call(payloadPtr, errorBuffer, _nativeErrorBufferLength);
       if (code != 0) {
@@ -145,7 +145,7 @@ class XrayFfiEngine {
   }
 
   int _callNoArg(int Function(Pointer<Utf8>, int) call, String operation) {
-    final errorBuffer = calloc<Utf8>(_nativeErrorBufferLength);
+    final errorBuffer = calloc<Uint8>(_nativeErrorBufferLength).cast<Utf8>();
     try {
       final code = call(errorBuffer, _nativeErrorBufferLength);
       if (code != 0) {
@@ -160,7 +160,7 @@ class XrayFfiEngine {
 
   int _callDelay(int Function(Pointer<Utf8>, Pointer<Utf8>, int) call, String input, String operation) {
     final payloadPtr = input.toNativeUtf8();
-    final errorBuffer = calloc<Utf8>(_nativeErrorBufferLength);
+    final errorBuffer = calloc<Uint8>(_nativeErrorBufferLength).cast<Utf8>();
     try {
       final result = call(payloadPtr, errorBuffer, _nativeErrorBufferLength);
       if (result < -1) {
