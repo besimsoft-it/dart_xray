@@ -1,0 +1,13 @@
+name: dart_xray_example
+description: Demonstrates the dart_xray plugin.
+publish_to: none
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+  flutter: '>=3.22.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  dart_xray:
+    path: ../
